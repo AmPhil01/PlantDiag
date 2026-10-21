@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#008751" />
+  <title>PlantDiag — Webapp version 1.2.2</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- TensorFlow.js runtime (WebGL backend) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+</head>
+<body>
+
+  <!-- ================= PHONE FRAME ================= -->
+  <div class="phone-frame" role="application" aria-label="PlantDiag mobile app">
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons" aria-hidden="true">
+        <span class="status-signal"></span>
+        <span class="status-wifi"></span>
+        <span class="status-battery"></span>
+      </div>
+    </div>
+
+    <!-- App header -->
+    <header class="app-header">
+      <div class="header-left">
+        <span class="header-leaf" aria-hidden="true">🌿</span>
+        <div class="header-text">
+          <h1 class="header-title">PlantDiag <span class="header-version">v1.2.2</span></h1>
+          <p class="header-sub">AI plant disease detection</p>
+        </div>
+      </div>
+      <span class="web-badge">Webapp version 1.2.2</span>
+    </header>
+
+    <!-- Model engine + dataset check markers -->
+    <section class="card engine-card" id="engineCard" aria-label="Model engine and data sources">
+      <div class="engine-row">
+        <div class="engine-badge" id="engineBadge">Loading engine…</div>
+      </div>
+      <div class="dataset-markers" id="datasetMarkers">
+        <!-- populated by app.js from datasets.json -->
+      </div>
+    </section>
+
+    <!-- Scrollable app body -->
+    <main class="app-body" id="appBody">
+
+      <!-- Model status banner (hidden until a load result is known) -->
+      <div class="status-banner" id="statusBanner" role="status" aria-live="polite" hidden></div>
+
+      <!-- Upload / camera zone -->
+      <section class="card upload-card" aria-label="Upload a leaf photo">
+        <h2 class="card-title">📸 Scan a leaf</h2>
+        <p class="card-hint">Take a photo or upload an image of a plant leaf to diagnose it.</p>
+
+        <div
+          class="upload-zone"
+          id="uploadZone"
+          role="button"
+          tabindex="0"
+          aria-label="Upload or drop an image here"
+        >
+          <span class="upload-icon" aria-hidden="true">🍃</span>
+          <p class="upload-main">Tap to choose a photo</p>
+          <p class="upload-sub">or drag &amp; drop an image here</p>
+        </div>
+
+        <div class="upload-actions">
+          <button type="button" class="btn btn-primary" id="galleryBtn">
+            🖼️ Gallery
+          </button>
+          <button type="button" class="btn btn-outline" id="cameraBtn">
+            📷 Camera
+          </button>
+        </div>
+        <p class="camera-note">Camera needs HTTPS (or a trusted local server). File upload always works.</p>
+
+        <!-- Hidden native inputs -->
+        <input type="file" id="galleryInput" accept="image/*" hidden />
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden />
+      </section>
+
+      <!-- Image preview -->
+      <section class="card preview-card" id="previewCard" hidden aria-label="Selected image preview">
+        <h2 class="card-title">Selected image</h2>
+        <div class="preview-frame">
+          <img id="previewImg" alt="Selected plant leaf preview" />
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="analyzeBtn">
+          🔬 Analyze this leaf
+        </button>
+      </section>
+
+      <!-- Loading spinner -->
+      <section class="card loading-card" id="loadingCard" hidden aria-label="Analyzing">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="loading-text">Analyzing leaf…</p>
+        <p class="loading-sub">Running the MobileNetV3Small model in your browser</p>
+      </section>
+
+      <!-- Error state -->
+      <section class="card error-card" id="errorCard" hidden role="alert">
+        <h2 class="card-title error-title">⚠️ Something went wrong</h2>
+        <p class="error-message" id="errorMessage"></p>
+        <details class="error-details" id="errorDetailsWrap" hidden>
+          <summary>Technical details</summary>
+          <pre id="errorDetails"></pre>
+        </details>
+        <button type="button" class="btn btn-outline btn-block" id="errorDismissBtn">
+          Dismiss
+        </button>
+      </section>
+
+      <!-- Results -->
+      <section class="card results-card" id="resultsCard" hidden aria-label="Diagnosis results">
+
+        <div class="result-hero" id="resultHero">
+          <span class="result-status" id="resultStatus">●</span>
+          <div class="result-hero-text">
+            <p class="result-label" id="resultLabel">—</p>
+            <p class="result-plant" id="resultPlant">—</p>
+          </div>
+          <div class="result-confidence">
+            <span class="confidence-value" id="confidenceValue">0.0%</span>
+            <span class="confidence-caption">confidence</span>
+          </div>
+        </div>
+
+        <h3 class="section-heading">Top 3 predictions</h3>
+        <ol class="prediction-list" id="predictionList"></ol>
+
+        <h3 class="section-heading">About this diagnosis</h3>
+        <div class="disease-info" id="diseaseInfo">
+          <p class="info-desc" id="infoDesc">—</p>
+          <p class="info-tips-title">Treatment tips</p>
+          <ul class="info-tips" id="infoTips"></ul>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-block" id="againBtn">
+          🔄 Analyze another image
+        </button>
+      </section>
+
+      <!-- Setup help (always available at bottom) -->
+      <section class="card help-card" aria-label="Setup instructions">
+        <h2 class="card-title">⚙️ One-time setup</h2>
+        <p class="help-text">
+          Browsers cannot read <code>.tflite</code> files directly. Convert your Colab model to
+          TensorFlow.js format, then drop the output into the <code>model/</code> folder:
+        </p>
+        <ol class="help-steps">
+          <li>Run <code>python convert_model.py</code> (converts <code>plant_disease_model.tflite</code> → <code>model/model.json</code> + weight shards).</li>
+          <li>Serve this folder over HTTP (e.g. <code>python -m http.server 8000</code> or VS Code Live Server).</li>
+          <li>Open the page, upload a leaf photo, and tap <strong>Analyze</strong>.</li>
+        </ol>
+        <p class="help-text">Full walkthrough: <code>README.md</code></p>
+      </section>
+
+    </main>
+
+    <!-- Bottom tab bar -->
+    <nav class="tab-bar" aria-label="App navigation">
+      <button type="button" class="tab-item active" data-tab="home">
+        <span class="tab-icon" aria-hidden="true">🏠</span>
+        <span class="tab-label">Home</span>
+      </button>
+      <button type="button" class="tab-item" data-tab="scan">
+        <span class="tab-icon" aria-hidden="true">🔬</span>
+        <span class="tab-label">Scan</span>
+      </button>
+      <button type="button" class="tab-item" data-tab="help">
+        <span class="tab-icon" aria-hidden="true">❓</span>
+        <span class="tab-label">Help</span>
+      </button>
+    </nav>
+
+    <!-- Home indicator -->
+    <div class="home-indicator" aria-hidden="true"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

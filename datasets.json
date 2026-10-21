@@ -1,0 +1,36 @@
+{
+  "engine": {
+    "name": "MobileNetV3Small (lightweight)",
+    "version": "1.2.2-lite",
+    "input": [224, 224, 3],
+    "classes": 38,
+    "backend": "TensorFlow.js (WebGL, on-device)",
+    "notes": "Low-weight engine for browser deployment. Convert via convert_model.py --lite"
+  },
+  "data_sources": [
+    {
+      "id": "plantvillage",
+      "name": "PlantVillage",
+      "description": "New Plant Diseases Dataset (PlantVillage) — 54,000+ leaf images across 38 classes.",
+      "classes": 38,
+      "split": "train / valid",
+      "status": "connected",
+      "check": true
+    },
+    {
+      "id": "naijastaple",
+      "name": "NaijaStaple",
+      "description": "Nigerian staple crops (cassava, maize, yam, cocoyam, plantain, sweet potato) disease imagery.",
+      "classes": 12,
+      "split": "train / valid",
+      "status": "connected",
+      "check": true
+    }
+  ],
+  "preprocessing": {
+    "resize": [224, 224],
+    "normalization": "pixel / 255.0 -> [0, 1]",
+    "color_order": "RGB",
+    "crop": "center square-crop before resize"
+  }
+}
