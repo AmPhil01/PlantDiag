@@ -14,7 +14,7 @@ const INPUT_SIZE = 224;
 const MODEL_URL = 'model/model.json';
 const LABELS_URL = 'model/labels.txt';
 const DATASETS_URL = 'datasets.json';
-const PROXY_URL = 'http://localhost:5000';
+const PROXY_URL = window.location.origin;
 
 const FALLBACK_LABELS = [
   'Apple___Apple_scab',

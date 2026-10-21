@@ -1,68 +1,45 @@
 #!/usr/bin/env python3
 """
-proxy.py — PlantDiag Webapp v1.2.2 Mistral reasoning proxy
-==========================================================
-Secure backend that forwards Mistral API requests from the browser.
-The API key is never embedded in the frontend — it is sent per-request
-from the settings modal and lives only in browser localStorage.
-
-REQUIRED:
-    pip install flask flask-cors requests python-dotenv
-
-RUN:
-    python proxy.py
-    # listens on http://localhost:5000
-
-ENDPOINTS:
-    GET  /health        — proxy health check
-    POST /reason        — forwards to Mistral chat/completions
-                          Body: { apiKey, model, prediction, confidence,
-                                  plant, disease, user_note }
+proxy.py — PlantDiag Webapp v1.2.2
+Flask backend serving the static frontend + Mistral reasoning proxy.
 """
 
 import os
-import json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import requests
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
-DEFAULT_MODEL = os.getenv("MISTRAL_MODEL", "mistral-small-latest")
 
 
-@app.route("/health", methods=["GET"])
+@app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "ok", "proxy": "plantdiag-mistral-proxy"})
+    return jsonify({"status": "ok"})
 
 
-@app.route("/reason", methods=["POST"])
+@app.route('/')
+def index():
+    return send_from_directory('.', 'index.html')
+
+
+@app.route('/<path:path>')
+def static_files(path):
+    return send_from_directory('.', path)
+
+
+@app.route('/reason', methods=['POST'])
 def reason():
-    """
-    Forward a reasoning request to Mistral.
-
-    Expected JSON body:
-    {
-      "apiKey": "sk-...",           // from settings modal (localStorage)
-      "model": "mistral-small-latest", // optional
-      "prediction": "Tomato___Late_blight",
-      "confidence": 0.87,
-      "plant": "Tomato",
-      "disease": "Late blight",
-      "user_note": "optional farmer note"
-    }
-    """
     data = request.get_json(silent=True) or {}
-
-    api_key = data.get("apiKey", "").strip()
-    model = data.get("model") or DEFAULT_MODEL
-    prediction = data.get("prediction", "unknown")
-    confidence = data.get("confidence", 0.0)
-    plant = data.get("plant", "unknown plant")
-    disease = data.get("disease", "unknown disease")
-    user_note = data.get("user_note", "")
+    api_key = data.get('apiKey', '').strip()
+    model = data.get('model') or 'mistral-small-latest'
+    prediction = data.get('prediction', 'unknown')
+    confidence = data.get('confidence', 0.0)
+    plant = data.get('plant', 'unknown plant')
+    disease = data.get('disease', 'unknown disease')
+    user_note = data.get('user_note', '')
 
     if not api_key:
         return jsonify({"error": "No Mistral API key provided. Set it in Settings."}), 401
@@ -89,47 +66,26 @@ def reason():
     try:
         resp = requests.post(
             MISTRAL_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
                 "model": model,
                 "messages": [
                     {"role": "system", "content": "You are a helpful agricultural extension assistant."},
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.4,
-                "max_tokens": 700,
+                "max_tokens": 700
             },
-            timeout=45,
+            timeout=45
         )
-
         if not resp.ok:
-            # Pass through Mistral error messages helpfully
-            try:
-                err_detail = resp.json()
-            except Exception:
-                err_detail = resp.text
-            return jsonify({
-                "error": f"Mistral API error {resp.status_code}",
-                "detail": err_detail,
-            }), 502
-
+            return jsonify({"error": f"Mistral API error {resp.status_code}"}), 502
         result = resp.json()
-        text = result["choices"][0]["message"]["content"]
-        return jsonify({"reasoning": text, "model": model})
-
+        return jsonify({"reasoning": result["choices"][0]["message"]["content"], "model": model})
     except requests.RequestException as e:
         return jsonify({"error": f"Failed to reach Mistral: {str(e)}"}), 502
 
 
 if __name__ == "__main__":
-    print("=" * 55)
-    print(" PlantDiag Mistral Proxy — http://localhost:5000")
-    print(" " * 55)
-    print(" Endpoints:")
-    print("   GET  /health")
-    print("   POST /reason   (send apiKey from frontend settings)")
-    print("=" * 55)
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
