@@ -323,9 +323,22 @@ function initUploadUI() {
     }
   });
 
-  els.galleryBtn.addEventListener('click', () => els.galleryInput.click());
-  els.cameraBtn.addEventListener('click', () => {
+  els.galleryBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    els.galleryInput.click();
+  });
+  els.cameraBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     els.cameraInput.click();
+  });
+  // Also make the whole upload zone clickable
+  els.uploadZone.addEventListener('click', (e) => {
+    // Only open gallery if clicking the zone itself, not buttons inside it
+    if (e.target === els.uploadZone || e.target.closest('.upload-main') || e.target.closest('.upload-sub') || e.target.closest('.upload-icon')) {
+      els.galleryInput.click();
+    }
   });
 
   els.galleryInput.addEventListener('change', onFileChosen);
